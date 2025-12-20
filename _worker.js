@@ -3,7 +3,7 @@ import { connect } from 'cloudflare:sockets';
 // =============================================================================
 // 🟣 用户配置区域 (优先级环境变量-代码硬编码)           下方内容可改生效于内置代码 【不使用环境变量的情况下】
 // =============================================================================
-const UUID = "06b65903-406d-4a41-8463-6fd5c0ee7798"; // 修改可用的uuid
+const UUID = "2dd002b8-f0e3-4ed7-b47d-cf133443073c"; // 修改可用的uuid
 const WEB_PASSWORD = "";  //自己要修改自定义的登录密码
 const SUB_PASSWORD = "";  // 自己要修改自定义的订阅密码
 const DEFAULT_PROXY_IP = "ProxyIP.US.CMLiussss.net";  //可修改自定义的proxyip
