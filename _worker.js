@@ -791,29 +791,32 @@ function dashPage(host, uuid, proxyip, subpass, converter, env, clientIP, hasAut
             </div>
         </div>
 
-        <div class="card">
-            <div class="section-title"><i class="ri-link-m"></i> 快速订阅链接</div>
-            <div class="input-wrapper">
-                <input type="text" id="autoSub" value="${defaultSubLink}" readonly onclick="this.select()">
-                <button class="btn btn-primary" onclick="copyId('autoSub')"><i class="ri-file-copy-line"></i> 复制</button>
+        <!-- 功能模块网格布局 -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px;">
+            <div class="card">
+                <div class="section-title"><i class="ri-link-m"></i> 快速订阅链接</div>
+                <div class="input-wrapper">
+                    <input type="text" id="autoSub" value="${defaultSubLink}" readonly onclick="this.select()">
+                    <button class="btn btn-primary" onclick="copyId('autoSub')"><i class="ri-file-copy-line"></i> 复制</button>
+                </div>
             </div>
-        </div>
 
-        <div class="card">
-            <div class="section-title" style="justify-content:space-between">
-                <span><i class="ri-spam-3-line"></i> IP 黑名单管理</span>
-                <span style="font-size:0.8rem; color:var(--text-secondary)" id="banCount">0 个</span>
-            </div>
-            <div class="input-wrapper">
-                <input type="text" id="newBanIp" placeholder="输入恶意 IP 地址 (例如 1.2.3.4)">
-                <button class="btn btn-danger" onclick="addBan()"><i class="ri-prohibited-line"></i> 封禁</button>
-            </div>
-            <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--card-border); border-radius: 8px;">
-                <table>
-                    <tbody id="banListBody">
-                        <tr><td style="text-align:center; color:#666">暂无数据</td></tr>
-                    </tbody>
-                </table>
+            <div class="card">
+                <div class="section-title" style="justify-content:space-between">
+                    <span><i class="ri-spam-3-line"></i> IP 黑名单管理</span>
+                    <span style="font-size:0.8rem; color:var(--text-secondary)" id="banCount">0 个</span>
+                </div>
+                <div class="input-wrapper">
+                    <input type="text" id="newBanIp" placeholder="输入恶意 IP 地址 (例如 1.2.3.4)">
+                    <button class="btn btn-danger" onclick="addBan()"><i class="ri-prohibited-line"></i> 封禁</button>
+                </div>
+                <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--card-border); border-radius: 8px;">
+                    <table>
+                        <tbody id="banListBody">
+                            <tr><td style="text-align:center; color:#666">暂无数据</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
