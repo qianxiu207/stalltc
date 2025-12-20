@@ -3,7 +3,7 @@ import { connect } from 'cloudflare:sockets';
 // =============================================================================
 // 🟣 用户配置区域 (优先级环境变量-代码硬编码)           下方内容可改生效于内置代码 【不使用环境变量的情况下】
 // =============================================================================
-const UUID = "2dd002b8-f0e3-4ed7-b47d-cf133443073c"; // 修改可用的uuid
+const UUID = ""; // 修改可用的uuid
 const WEB_PASSWORD = "";  //自己要修改自定义的登录密码
 const SUB_PASSWORD = "";  // 自己要修改自定义的订阅密码
 const DEFAULT_PROXY_IP = "ProxyIP.US.CMLiussss.net";  //可修改自定义的proxyip
@@ -11,10 +11,7 @@ const DEFAULT_SUB_DOMAIN = "";  //可修改自定义的sub订阅器
 const TG_GROUP_URL = "";   //可修改自定义内容
 const TG_CHANNEL_URL = "";  //可此修改自定义内容
 const PROXY_CHECK_URL = "https://kaic.hidns.co/";  //可修改自定义的proxyip检测站
-const DEFAULT_CONVERTER = "https://subapi.cmliussss.net";  //可修改自定义后端api
-const CLASH_CONFIG = "https://raw.githubusercontent.com/cmliu/ACL4SSR/main/Clash/config/ACL4SSR_Online_Full_MultiMode.ini"; //可修改自定义订阅配置转换ini
-const SINGBOX_CONFIG_V12 = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.12.x/sing-box.json"; //禁止修改 优先使用1.12 后用1.11
-const SINGBOX_CONFIG_V11 = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.11.x/sing-box.json"; //禁止修改
+// 本地节点配置功能 - 移除远程订阅转换器
 const TG_BOT_TOKEN = ""; //你的机器人token
 const TG_CHAT_ID = "";  //你的TG ID
 const ADMIN_IP = "";  //你的白名单IP 保护你不会被自己域名拉黑 (支持多IP，使用英文逗号分隔)
@@ -614,10 +611,7 @@ function dashPage(host, uuid, proxyip, subpass, subdomain, converter, env, clien
                 </div>
            </div>
 
-            <div class="checkbox-row">
-                <input type="checkbox" id="clashMode" onchange="toggleClash()">
-                <label for="clashMode">启用 Clash 模式</label>
-            </div>
+
             
             <div class="input-block">
                 <label>订阅链接</label>
@@ -630,25 +624,16 @@ function dashPage(host, uuid, proxyip, subpass, subdomain, converter, env, clien
             </div>
         </div>
 
-        <!-- 🛠️ 优选IP与远程配置卡片 (移动到下方) -->
+        <!-- 🛠️ 本地节点配置卡片 -->
         <div class="card">
             <div class="section-title" style="justify-content:space-between">
-                <span>🛠️ 优选 IP 与 远程配置</span>
+                <span>🛠️ 本地节点配置</span>
                 <button class="tool-btn" onclick="saveNodeConfig()" style="width:auto;padding:6px 12px;font-size:0.8rem;background:var(--green);border:none;color:white;font-weight:bold;">💾 保存配置</button>
             </div>
-            <div style="font-size:0.8rem;color:#e74c3c;margin-bottom:10px;">⚠️ 注意：若要在此生效，请确保 Cloudflare 后台未设置对应环境变量 (ADD/ADDAPI/ADDCSV)</div>
             
             <div class="input-block">
-                <label>ADD - 本地优选 IP (格式: IP:Port#Name，一行一个)</label>
+                <label>本地优选 IP (格式: IP:Port#Name，一行一个)</label>
                 <textarea id="inpAdd" placeholder="1.1.1.1:443#US">${safeVal(add)}</textarea>
-            </div>
-            <div class="input-block">
-                <label>ADDAPI - 远程优选 TXT 链接 (支持多行)</label>
-                <textarea id="inpAddApi" placeholder="https://example.com/ips.txt">${safeVal(addApi)}</textarea>
-            </div>
-             <div class="input-block">
-                <label>ADDCSV - 远程优选 CSV 链接 (支持多行)</label>
-                <textarea id="inpAddCsv" placeholder="https://example.com/ips.csv">${safeVal(addCsv)}</textarea>
             </div>
         </div>
 
@@ -810,9 +795,7 @@ function dashPage(host, uuid, proxyip, subpass, subdomain, converter, env, clien
         // 新增：保存节点配置
         function saveNodeConfig() {
             const data = {
-                ADD: val('inpAdd'),
-                ADDAPI: val('inpAddApi'),
-                ADDCSV: val('inpAddCsv')
+                ADD: val('inpAdd')
             };
             saveConfig(data, null);
         }
@@ -837,20 +820,15 @@ function dashPage(host, uuid, proxyip, subpass, subdomain, converter, env, clien
             let base = document.getElementById('subDom').value.trim();
             let host = document.getElementById('hostDom').value.trim();
             let p = document.getElementById('pIp').value.trim();
-            let isClash = document.getElementById('clashMode').checked;
             let path = p ? "/proxyip=" + p : "/";
             const search = new URLSearchParams();
             search.set('uuid', UUID); search.set('encryption', 'none'); search.set('security', 'tls'); search.set('sni', host); search.set('alpn', 'h3');
             search.set('fp', 'random'); search.set('allowInsecure', '1'); search.set('type', 'ws'); search.set('host', host); search.set('path', path);
             let finalUrl = \`https://\${base}/sub?\${search.toString()}\`;
-            if (isClash) {
-                let subUrl = CONVERTER + "/sub?target=clash&url=" + encodeURIComponent(finalUrl) + "&emoji=true&list=false&sort=false";
-                document.getElementById('finalLink').value = subUrl;
-            } else { document.getElementById('finalLink').value = finalUrl; }
+            document.getElementById('finalLink').value = finalUrl;
         }
 
-        function toggleClash() { updateLink();
-        }
+
         function copyId(id) { const el = document.getElementById(id); el.select();
         navigator.clipboard.writeText(el.value).then(() => { const t = document.getElementById('toast'); t.classList.add('show'); t.style.opacity=1; setTimeout(() => t.style.opacity=0, 2000); });
         }
@@ -1052,72 +1030,45 @@ export default {
 
           const requestProxyIp = url.searchParams.get('proxyip') || _PROXY_IP;
           const pathParam = requestProxyIp ? "/proxyip=" + requestProxyIp : "/";
-          
-          // 🛡️ 修复点：检查 SUB_DOMAIN 是否有效，避免非法 URL
-          let hasValidSubDomain = _SUB_DOMAIN && _SUB_DOMAIN.trim() !== "" && _SUB_DOMAIN !== host;
-          
-          // 🟢 优化逻辑：优先处理本地 ADD 内容，确保纯本地模式正常工作
+          const subUrl = `https://${_SUB_DOMAIN}/sub?uuid=${_UUID}&encryption=none&security=tls&sni=${host}&alpn=h3&fp=random&allowInsecure=1&type=ws&host=${host}&path=${encodeURIComponent(pathParam)}`;
+
+          // 🟢 本地节点配置功能 - 移除远程订阅转换器
+
+          try {
+            // 🛡️ 修复漏洞：防止 SUB_DOMAIN 设置为自己时导致的无限循环
+            if (host.toLowerCase() !== _SUB_DOMAIN.toLowerCase()) {
+                const res = await fetch(subUrl, { headers: { 'User-Agent': UA } });
+                if (res.ok) {
+                    let body = await res.text();
+                    if (_PS) {
+                        try {
+                            const decoded = atob(body); 
+                            const modified = decoded.split('\n').map(line => {
+                                line = line.trim();
+                                if (!line || !line.includes('://')) return line;
+                                if (line.includes('#')) return line + encodeURIComponent(` ${_PS}`);
+                                return line + '#' + encodeURIComponent(_PS);
+                            }).join('\n');
+                            body = btoa(modified); 
+                        } catch(e) {
+                             if(body.includes('://')) {
+                                 body = body.split('\n').map(line => {
+                                     line = line.trim();
+                                     if (!line || !line.includes('://')) return line;
+                                     if (line.includes('#')) return line + encodeURIComponent(` ${_PS}`);
+                                     return line + '#' + encodeURIComponent(_PS);
+                                 }).join('\n');
+                             }
+                        }
+                    }
+                    return new Response(body, { status: 200, headers: res.headers });
+                }
+            }
+        } catch(e) {}
+
           const allIPs = await getCustomIPs(env);
-          const hasLocalNodes = allIPs && allIPs.trim() !== "";
-          
-          // 如果配置了有效的远程订阅源，尝试获取远程内容
-          if (hasValidSubDomain) {
-              const subUrl = `https://${_SUB_DOMAIN}/sub?uuid=${_UUID}&encryption=none&security=tls&sni=${host}&alpn=h3&fp=random&allowInsecure=1&type=ws&host=${host}&path=${encodeURIComponent(pathParam)}`;
-
-              // 🟢 修复点：移除了重复定义的 UA_L，直接使用顶层变量，避免 TDZ 报错
-              if (UA_L.includes('sing-box') || UA_L.includes('singbox') || UA_L.includes('clash') || UA_L.includes('meta')) {
-                  const type = (UA_L.includes('clash') || UA_L.includes('meta')) ? 'clash' : 'singbox';
-                  const config = type === 'clash' ? CLASH_CONFIG : SINGBOX_CONFIG_V12;
-                  const subApi = `${_CONVERTER}/sub?target=${type}&url=${encodeURIComponent(subUrl)}&config=${encodeURIComponent(config)}&emoji=true&list=false&sort=false&fdn=false&scv=false`;
-                  try {
-                      const res = await fetch(subApi);
-                      return new Response(res.body, { status: 200, headers: res.headers });
-                  } catch(e) {
-                      // 转换器失败时，继续尝试直接获取远程订阅
-                  }
-              }
-
-              try {
-                  const res = await fetch(subUrl, { headers: { 'User-Agent': UA } });
-                  if (res.ok) {
-                      let body = await res.text();
-                      if (_PS) {
-                          try {
-                              const decoded = atob(body); 
-                              const modified = decoded.split('\n').map(line => {
-                                  line = line.trim();
-                                  if (!line || !line.includes('://')) return line;
-                                  if (line.includes('#')) return line + encodeURIComponent(` ${_PS}`);
-                                  return line + '#' + encodeURIComponent(_PS);
-                              }).join('\n');
-                              body = btoa(modified); 
-                          } catch(e) {
-                               if(body.includes('://')) {
-                                   body = body.split('\n').map(line => {
-                                       line = line.trim();
-                                       if (!line || !line.includes('://')) return line;
-                                       if (line.includes('#')) return line + encodeURIComponent(` ${_PS}`);
-                                       return line + '#' + encodeURIComponent(_PS);
-                                   }).join('\n');
-                               }
-                          }
-                      }
-                      return new Response(body, { status: 200, headers: res.headers });
-                  }
-              } catch(e) {
-                  // 远程订阅失败时，继续处理本地节点
-              }
-          }
-          
-          // 🟢 修复点：确保即使远程订阅失败，也能返回本地节点
-          // 如果没有有效的远程订阅源或远程订阅失败，返回本地节点
-          if (hasLocalNodes) {
-              const listText = genNodes(host, _UUID, requestProxyIp, allIPs, _PS);
-              return new Response(btoa(unescape(encodeURIComponent(listText))), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-          }
-          
-          // 如果既没有远程订阅源也没有本地节点，返回空订阅
-          return new Response(btoa(""), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+          const listText = genNodes(host, _UUID, requestProxyIp, allIPs, _PS);
+          return new Response(btoa(unescape(encodeURIComponent(listText))), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       }
 
       // 🟢 常规订阅 /sub
@@ -1165,10 +1116,8 @@ export default {
           (!!(await getSafeEnv(env, 'CF_EMAIL', '')) && !!(await getSafeEnv(env, 'CF_KEY', '')));
           
           const _ADD = await getSafeEnv(env, 'ADD', "");
-          const _ADDAPI = await getSafeEnv(env, 'ADDAPI', "");
-          const _ADDCSV = await getSafeEnv(env, 'ADDCSV', "");
 
-          return new Response(dashPage(url.hostname, _UUID, _PROXY_IP, _SUB_PW, _SUB_DOMAIN, _CONVERTER, env, clientIP, hasPassword, tgState, cfState, _ADD, _ADDAPI, _ADDCSV), { status: 200, headers: noCacheHeaders });
+          return new Response(dashPage(url.hostname, _UUID, _PROXY_IP, _SUB_PW, _SUB_DOMAIN, _CONVERTER, env, clientIP, hasPassword, tgState, cfState, _ADD, "", ""), { status: 200, headers: noCacheHeaders });
       }
       
       // 🟣 代理逻辑 (WebSocket)
@@ -1192,26 +1141,8 @@ export default {
 };
 
 async function getCustomIPs(env) {
-    let ips = await getSafeEnv(env, 'ADD', "");
-    const addApi = await getSafeEnv(env, 'ADDAPI', "");
-    const addCsv = await getSafeEnv(env, 'ADDCSV', "");
-    
-    // 适配多行链接
-    if (addApi) {
-        const urls = addApi.split('\n').filter(u => u.trim() !== "");
-        for (const url of urls) {
-            try { const res = await fetch(url.trim(), { headers: { 'User-Agent': 'Mozilla/5.0' } }); if (res.ok) { const text = await res.text(); ips += "\n" + text; } } catch (e) {}
-        }
-    }
-    
-    // 适配多行链接
-    if (addCsv) {
-        const urls = addCsv.split('\n').filter(u => u.trim() !== "");
-        for (const url of urls) {
-            try { const res = await fetch(url.trim(), { headers: { 'User-Agent': 'Mozilla/5.0' } }); if (res.ok) { const text = await res.text(); const lines = text.split('\n'); for (let line of lines) { const parts = line.split(','); if (parts.length >= 2) ips += `\n${parts[0].trim()}:443#${parts[1].trim()}`; } } } catch (e) {}
-        }
-    }
-    return ips;
+    // 本地节点配置功能 - 仅使用本地配置
+    return await getSafeEnv(env, 'ADD', "");
 }
 
 function genNodes(h, u, p, ipsText, ps = "") {
