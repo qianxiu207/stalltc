@@ -79,10 +79,10 @@ async function checkFlood(env, ip) {
     if (!env.DB) return false;
     const now = Math.floor(Date.now() / 1000);
     try {
-        await env.DB.prepare("DELETE FROM flood WHERE updated_at < ?").bind(now - 60).run();
+        await env.DB.prepare("DELETE FROM flood WHERE updated_at < ?").bind(now - 600).run();
         await env.DB.prepare(`INSERT INTO flood (ip, count, updated_at) VALUES (?, 1, ?) ON CONFLICT(ip) DO UPDATE SET count = count + 1, updated_at = ?`).bind(ip, now, now).run();
         const { results } = await env.DB.prepare("SELECT count FROM flood WHERE ip = ?").bind(ip).all();
-        return (results[0]?.count || 0) >= 5;
+        return (results[0]?.count || 0) >= 30;
     } catch(e) { return false; }
 }
 
@@ -364,17 +364,13 @@ function loginPage(tgGroup, tgChannel) {
         <h2>禁止进入</h2>
         <input type="password" id="pwd" placeholder="请输入密码" autofocus autocomplete="new-password" onkeypress="if(event.keyCode===13)verify()">
         <div class="btn-group">
-            <button class="btn-primary" onclick="alert('请直接输入密码解锁')">请输入密码</button>
+
             <button class="btn-unlock" onclick="verify()">解锁后台</button>
         </div>
-        <div class="social-links">
-            <a href="javascript:void(0)" onclick="gh()" class="pill">🔥 烈火项目直达</a>
-            <a href="${tgChannel}" target="_blank" class="pill">📢 天诚频道组</a>
-            <a href="${tgGroup}" target="_blank" class="pill">✈️ 天诚交流群</a>
-        </div>
+
     </div>
     <script>
-        function gh(){fetch("?flag=github&t="+Date.now(),{keepalive:!0});window.open("https://github.com/xtgm/stallTCP1.3V1","_blank")}
+
         function verify(){
             const p = document.getElementById("pwd").value;
             if(!p) return;
