@@ -1239,13 +1239,24 @@ export default {
 
       if (url.pathname === '/favicon.ico') return new Response(null, { status: 404 });
 
-      // 🟢 伪装页面：根路径直接重定向到 Bing，增强隐蔽性
-      if (url.pathname === '/') {
-          return Response.redirect('https://cn.bing.com', 302);
-      }
+	      // 🟢 API 接口
+	      const flag = url.searchParams.get('flag');
 
-      // 🟢 API 接口
-      const flag = url.searchParams.get('flag');
+	      // 🛡️ 根路径也参与防洪检测：避免通过 /?flag=... 等方式绕过后续防洪逻辑
+	      // 说明：
+	      // - 普通访问 /（无 flag）会继续走下方“自动防刷”逻辑；
+	      // - 带 flag 的请求会在这里先做一次防洪检测，防止提前 return 导致绕过。
+	      if (url.pathname === '/' && flag && (env.DB || env.LH) && !isAdmin && r.headers.get('Upgrade') !== 'websocket') {
+	          const isFlood = await checkFlood(env, clientIP);
+	          if (isFlood) {
+	              const alreadyBanned = await checkBan(env, clientIP);
+	              if (!alreadyBanned) {
+	                  await banIP(env, clientIP);
+	                  await sendTgMsg(ctx, env, "🚫 自动封禁通知 (首次)", r, `原因: 频繁请求 (>=5次)\n来源 IP: ${clientIP}`, false);
+	              }
+	              return new Response("403 Forbidden", { status: 403 });
+	          }
+	      }
       if (flag) {
           if (flag === 'github') {
               await sendTgMsg(ctx, env, "🌟 用户点击了烈火项目", r, "来源: 登录页面直达链接", isAdmin);
@@ -1328,6 +1339,11 @@ export default {
               }
           }
       }
+
+	      // 🟢 伪装页面：根路径先通过防洪检测，再重定向到 Bing
+	      if (r.headers.get('Upgrade') !== 'websocket' && url.pathname === '/') {
+	          return Response.redirect('https://cn.bing.com', 302);
+	      }
 
       // 🟢 订阅接口
       if (_SUB_PW && url.pathname === `/${_SUB_PW}`) {
