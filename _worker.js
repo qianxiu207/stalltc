@@ -10,7 +10,7 @@ const UUID = ""; // 修改可用的uuid
 const WEB_PASSWORD = "";  //自己要修改自定义的登录密码
 const SUB_PASSWORD = "";  // 自己要修改自定义的订阅密码
 const DEFAULT_PROXY_IP = "";  //可修改自定义的proxyip
-const ROOT_REDIRECT_URL = "https://cn.bing.com"; // 根路径 `/` 重定向目标（支持 env/D1/KV 覆盖）
+const ROOT_REDIRECT_URL = ""; // 根路径 `/` 重定向目标（支持 env/D1/KV 覆盖）
 
 const TG_GROUP_URL = "";   //可修改自定义内容
 const TG_CHANNEL_URL = "";  //可此修改自定义内容
