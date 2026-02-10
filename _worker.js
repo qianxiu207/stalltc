@@ -1,16 +1,16 @@
 import { connect } from 'cloudflare:sockets';
 
 // =============================================================================
-// 🟣 用户配置区域 (优先级：环境变量 > 代码硬编码)
+// 🟣 用户配置区域
 // =============================================================================
-const UUID = ""; // 默认 UUID
-const WEB_PASSWORD = "";  // 后台管理密码
+const UUID = ""; // 你的 UUID
+const WEB_PASSWORD = "";  // 管理面板密码
 const SUB_PASSWORD = "";  // 订阅路径密码
-const DEFAULT_PROXY_IP = "";  // 默认回退 ProxyIP (单 IP 或域名)
-const ROOT_REDIRECT_URL = ""; // 根路径重定向
+const DEFAULT_PROXY_IP = "";  // 你的 ProxyIP (例如: 1.2.3.4 或 domain.com)
+const ROOT_REDIRECT_URL = ""; 
 
 // =============================================================================
-// ⚡️ 核心逻辑区 (无状态版)
+// ⚡️ 核心逻辑区
 // =============================================================================
 const MAX_PENDING=2097152,KEEPALIVE=15000,STALL_TO=8000,MAX_STALL=12,MAX_RECONN=24;
 const buildUUID=(a,i)=>[...a.slice(i,i+16)].map(n=>n.toString(16).padStart(2,'0')).join('').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/,'$1-$2-$3-$4-$5');
@@ -18,11 +18,9 @@ const extractAddr=b=>{const o=18+b[17]+1,p=(b[o]<<8)|b[o+1],t=b[o+2];let l,h,O=o
 
 const PT_TYPE = 'v'+'l'+'e'+'s'+'s';
 
-function getEnv(env, key, fallback) {
-    return env[key] || fallback;
-}
+function getEnv(env, key, fallback) { return env[key] || fallback; }
 
-// 解析单个 IP 字符串 (支持 host:port, [ipv6]:port, 或纯 host 默认为 443)
+// 解析单个 IP 或域名
 async function parseIP(p){
     if(!p) return null;
     p=p.trim().toLowerCase();
@@ -55,10 +53,10 @@ async function getDynamicUUID(key, refresh = 86400) {
 }
 
 /**
- * 主处理函数
- * @param {WebSocket} ws 客户端 WebSocket
- * @param {Object} proxyConfig 后备代理配置 {address, port}
- * @param {string} uuid 用户 UUID
+ * 核心处理函数
+ * @param {WebSocket} ws 
+ * @param {Object} proxyConfig 单个 ProxyIP 配置
+ * @param {string} uuid 
  */
 const handle = (ws, proxyConfig, uuid) => {
   const pool = new Pool();
@@ -101,30 +99,37 @@ const handle = (ws, proxyConfig, uuid) => {
   con = false; cnt = 0; scr = Math.min(1, scr + 0.15); lact = Date.now(); rdL();
   wtL() } catch { con = false; scr = Math.max(0.1, scr - 0.2); rcn() } };
   
-  // 🟢 核心连接逻辑：优先直连 -> 失败则回退 ProxyIP
+  // 🟢 智能连接逻辑 (Direct -> Fallback Proxy)
   const cn = async () => {
-    // 1. 尝试直连 (ADD 目标)
+    // 1. 尝试直连 (带 2.5秒 超时控制)
+    // 这里的超时是为了解决 CF 屏蔽请求时可能导致的长时间等待问题
     try {
-        const direct = connect({ hostname: inf.host, port: inf.port });
-        await direct.opened;
+        const directPromise = connect({ hostname: inf.host, port: inf.port });
+        // 使用 Promise.race 实现快速失败
+        const direct = await Promise.race([
+            directPromise.opened.then(() => directPromise),
+            new Promise((_, reject) => setTimeout(() => reject('Direct timeout'), 2500))
+        ]);
         return direct;
     } catch (e) {
-        // 直连失败，进入下一步
+        // 直连失败（报错或超时），静默进入下一步
+        // console.log("直连失败，启用 ProxyIP 回退");
     }
 
-    // 2. 尝试 ProxyIP (回退)
+    // 2. 直连失败，回退到 ProxyIP
+    // 这正是解决 CF 无法访问 CF 自身问题的关键步骤
     if (proxyConfig && proxyConfig.address) {
         try {
             const proxy = connect({ hostname: proxyConfig.address, port: proxyConfig.port });
             await proxy.opened;
             return proxy;
         } catch (e) {
-            // 代理也失败
+            // Proxy 也连不上，那就真没办法了
         }
     }
 
     // 3. 全部失败
-    throw new Error('All connection attempts failed');
+    throw new Error('Connection failed: Direct and Proxy both unreachable');
   };
   
   const rcn = async () => { if (!inf || ws.readyState !== 1) { cln(); ws.close(1011);
@@ -171,7 +176,7 @@ function dashPage(host, uuid, proxyip, subpass) {
 }
 
 // =============================================================================
-// 🟢 主入口
+// 🟢 主入口 (Fetch Event)
 // =============================================================================
 export default {
   async fetch(r, env, ctx) {
@@ -186,10 +191,8 @@ export default {
       const _PROXY_IP_RAW = getEnv(env, 'PROXYIP', DEFAULT_PROXY_IP);
       const _PS = getEnv(env, 'PS', ""); 
       
-      // 处理 _PROXY_IP: 如果是列表，只取第一个
       const _PROXY_IP = _PROXY_IP_RAW ? _PROXY_IP_RAW.split(/[,\n]/)[0].trim() : "";
-
-      // 根路径重定向
+      
       let _ROOT_REDIRECT = getEnv(env, 'ROOT_REDIRECT_URL', ROOT_REDIRECT_URL);
       if (!_ROOT_REDIRECT.includes('://')) _ROOT_REDIRECT = 'https://' + _ROOT_REDIRECT;
 
@@ -204,7 +207,7 @@ export default {
           return new Response(btoa(unescape(encodeURIComponent(listText))), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       }
 
-      // 2. HTTP 请求 (面板/重定向)
+      // 2. HTTP 请求
       if (r.headers.get('Upgrade') !== 'websocket') {
           if (url.pathname === '/') return Response.redirect(_ROOT_REDIRECT, 302);
           if (url.pathname === '/admin' || url.pathname === '/admin/') {
@@ -218,16 +221,17 @@ export default {
       }
 
       // 3. WebSocket 代理处理
+      // 策略：解析出最终的单个 ProxyIP 对象，传给 handle
       let finalProxyConfig = null;
       
-      // 优先从 URL 参数获取 proxyip
+      // 优先级 1: URL 参数 (?proxyip=...)
       if (url.pathname.includes('/proxyip=')) {
         try {
             const proxyParam = url.pathname.split('/proxyip=')[1].split('/')[0];
             finalProxyConfig = await parseIP(proxyParam);
         } catch (e) {}
       } 
-      // 否则使用环境变量中的第一个 IP
+      // 优先级 2: 环境变量 (仅取第一个)
       else if (_PROXY_IP) {
         try {
             finalProxyConfig = await parseIP(_PROXY_IP);
