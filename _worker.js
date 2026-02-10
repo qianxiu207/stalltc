@@ -8,16 +8,15 @@ const WEB_PASSWORD = "";  // 管理面板密码 (请在后台环境变量中设�
 const SUB_PASSWORD = "";  // 订阅路径密码 (请在后台环境变量中设置 SUB_PASSWORD)
 
 // 🟢【重要配置】: 默认 ProxyIP (兜底地址)
-// 当订阅路径不包含具体 IP 时，会使用此地址。
-// 请务必在此处或 CF 后台变量 'PROXYIP' 中填入一个有效地址！
-const DEFAULT_PROXY_IP = "proxy.aliyun.com"; // 示例：可以填 ProxyIP.CMLiussss.net 或其他优选域名
+// 只有填了这里，生成的默认节点路径才会是干净的 /api/v1
+// 必须填！例如: proxy.aliyun.com 或 ProxyIP.CMLiussss.net
+const DEFAULT_PROXY_IP = ""; 
 
 // 🟢【伪装配置】: 默认节点路径
-// 这个路径会显示在订阅连接中，用来“骗过”GFW，看起来像正常 API 请求
-// 建议使用: /api/v1, /download, /chat, /video 等
+// 现在的逻辑是：如果使用默认ProxyIP，链接就是这个路径，没有任何后缀
 const NODE_DEFAULT_PATH = "/api/v1"; 
 
-const ROOT_REDIRECT_URL = ""; 
+const ROOT_REDIRECT_URL = "https://www.google.com"; 
 
 // =============================================================================
 // ⚡️ 核心逻辑区
@@ -190,7 +189,7 @@ export default {
       const _WEB_PW = getEnv(env, 'WEB_PASSWORD', WEB_PASSWORD);
       const _SUB_PW = getEnv(env, 'SUB_PASSWORD', SUB_PASSWORD);
       
-      // 🟢 核心变量获取：兼容后台变量名 'PROXYIP' 或 'DEFAULT_PROXY_IP'
+      // 🟢 核心变量获取
       const _PROXY_IP_RAW = env.PROXYIP || env.DEFAULT_PROXY_IP || DEFAULT_PROXY_IP;
       const _PS = getEnv(env, 'PS', ""); 
       
@@ -206,7 +205,8 @@ export default {
       if (isSubPath || isNormalSub) {
           const requestProxyIp = url.searchParams.get('proxyip') || _PROXY_IP;
           const allIPs = await getCustomIPs(env);
-          const listText = genNodes(host, _UUID, requestProxyIp, allIPs, _PS);
+          // 传入 _PROXY_IP 供 genNodes 比对是否需要隐藏参数
+          const listText = genNodes(host, _UUID, requestProxyIp, allIPs, _PS, _PROXY_IP);
           return new Response(btoa(unescape(encodeURIComponent(listText))), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       }
 
@@ -240,7 +240,7 @@ export default {
             finalProxyConfig = await parseIP(proxyParam);
         } catch (e) {}
       } 
-      // 优先级 3: 环境变量 (env.PROXYIP / env.DEFAULT_PROXY_IP / DEFAULT_PROXY_IP)
+      // 优先级 3: 环境变量 (默认兜底)
       else if (_PROXY_IP) {
         try {
             finalProxyConfig = await parseIP(_PROXY_IP);
@@ -282,25 +282,21 @@ async function getCustomIPs(env) {
     return ips;
 }
 
-function genNodes(h, u, p, ipsText, ps = "") {
+// 🟢 修复：genNodes 增加 defaultIP 参数进行比对
+function genNodes(h, u, p, ipsText, ps = "", defaultIP = "") {
     let l = ipsText.split('\n').filter(line => line.trim() !== "");
     
-    // 🟢 伪装逻辑: 
-    // 1. 默认使用 NODE_DEFAULT_PATH ("/api/v1")，不带 IP 参数，实现隐藏。
-    // 2. 只有当 p (请求的ProxyIP) 与后台设置的不一致时，才强制显示 ?proxyip=...
+    // 逻辑：
+    // 1. 如果当前的 ProxyIP (p) 等于 默认的 ProxyIP (defaultIP)，则不添加 ?proxyip= 参数
+    // 2. 否则，如果存在 p，则添加参数
     
-    // 先清理 p 中的换行等
-    const safeP = p ? p.trim() : "";
+    let safeP = p ? p.trim() : "";
+    let safeDef = defaultIP ? defaultIP.trim() : "";
     
     let finalPath = NODE_DEFAULT_PATH;
     
-    // 如果存在 safeP 且不为空 (这里可以增加逻辑：如果 safeP == DEFAULT_PROXY_IP 则也不加参数)
-    // 但为了逻辑简单，只有 safeP 存在时，我们才追加参数覆盖默认路径
-    if (safeP && safeP !== "") {
+    if (safeP && safeP !== "" && safeP !== safeDef) {
         finalPath += `?proxyip=${safeP}`;
-    } else {
-        // 如果没有传入 proxyip，且为了进一步优化，可以在这里追加 Early Data
-        finalPath += "?ed=2048"; 
     }
     
     const encodedPath = encodeURIComponent(finalPath);
