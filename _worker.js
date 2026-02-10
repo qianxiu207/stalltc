@@ -6,7 +6,17 @@ import { connect } from 'cloudflare:sockets';
 const UUID = ""; // 你的 UUID (请在后台环境变量中设置 UUID)
 const WEB_PASSWORD = "";  // 管理面板密码 (请在后台环境变量中设置 WEB_PASSWORD)
 const SUB_PASSWORD = "";  // 订阅路径密码 (请在后台环境变量中设置 SUB_PASSWORD)
-const DEFAULT_PROXY_IP = ""; 
+
+// 🟢【重要配置】: 默认 ProxyIP (兜底地址)
+// 当订阅路径不包含具体 IP 时，会使用此地址。
+// 请务必在此处或 CF 后台变量 'PROXYIP' 中填入一个有效地址！
+const DEFAULT_PROXY_IP = "proxy.aliyun.com"; // 示例：可以填 ProxyIP.CMLiussss.net 或其他优选域名
+
+// 🟢【伪装配置】: 默认节点路径
+// 这个路径会显示在订阅连接中，用来“骗过”GFW，看起来像正常 API 请求
+// 建议使用: /api/v1, /download, /chat, /video 等
+const NODE_DEFAULT_PATH = "/api/v1"; 
+
 const ROOT_REDIRECT_URL = ""; 
 
 // =============================================================================
@@ -99,9 +109,9 @@ const handle = (ws, proxyConfig, uuid) => {
   con = false; cnt = 0; scr = Math.min(1, scr + 0.15); lact = Date.now(); rdL();
   wtL() } catch { con = false; scr = Math.max(0.1, scr - 0.2); rcn() } };
   
-  // 🟢 智能连接逻辑 (Direct -> Fallback Proxy)
+  // 🟢 智能连接逻辑
   const cn = async () => {
-    // 1. 尝试直连 (带 2.5秒 超时控制)
+    // 1. 尝试直连
     try {
         const directPromise = connect({ hostname: inf.host, port: inf.port });
         const direct = await Promise.race([
@@ -109,24 +119,18 @@ const handle = (ws, proxyConfig, uuid) => {
             new Promise((_, reject) => setTimeout(() => reject('Direct timeout'), 2500))
         ]);
         return direct;
-    } catch (e) {
-        // 直连失败，进入 ProxyIP 回退
-    }
+    } catch (e) {}
 
-    // 2. 直连失败，回退到 ProxyIP
-    // 这里的 proxyConfig 现在完全来源于环境变量
+    // 2. 回退到 ProxyIP
     if (proxyConfig && proxyConfig.address) {
         try {
             const proxy = connect({ hostname: proxyConfig.address, port: proxyConfig.port });
             await proxy.opened;
             return proxy;
-        } catch (e) {
-            // Proxy 也连不上
-        }
+        } catch (e) {}
     }
 
-    // 3. 全部失败
-    throw new Error('Connection failed: Direct and Proxy both unreachable');
+    throw new Error('Connection failed');
   };
   
   const rcn = async () => { if (!inf || ws.readyState !== 1) { cln(); ws.close(1011);
@@ -186,8 +190,7 @@ export default {
       const _WEB_PW = getEnv(env, 'WEB_PASSWORD', WEB_PASSWORD);
       const _SUB_PW = getEnv(env, 'SUB_PASSWORD', SUB_PASSWORD);
       
-      // 🟢 修复核心：兼容多种变量名
-      // 依次尝试读取 'PROXYIP' -> 'DEFAULT_PROXY_IP' -> 最后是代码里的空字符串
+      // 🟢 核心变量获取：兼容后台变量名 'PROXYIP' 或 'DEFAULT_PROXY_IP'
       const _PROXY_IP_RAW = env.PROXYIP || env.DEFAULT_PROXY_IP || DEFAULT_PROXY_IP;
       const _PS = getEnv(env, 'PS', ""); 
       
@@ -237,7 +240,7 @@ export default {
             finalProxyConfig = await parseIP(proxyParam);
         } catch (e) {}
       } 
-      // 优先级 3: 环境变量 (env.PROXYIP 或 env.DEFAULT_PROXY_IP)
+      // 优先级 3: 环境变量 (env.PROXYIP / env.DEFAULT_PROXY_IP / DEFAULT_PROXY_IP)
       else if (_PROXY_IP) {
         try {
             finalProxyConfig = await parseIP(_PROXY_IP);
@@ -282,14 +285,25 @@ async function getCustomIPs(env) {
 function genNodes(h, u, p, ipsText, ps = "") {
     let l = ipsText.split('\n').filter(line => line.trim() !== "");
     
-    // 🟢 修复：彻底移除 ed=2560，使用纯净路径 "/"
-    // 并且如果 p (ProxyIP) 存在，通过标准 Query 参数添加，确保客户端能识别
-    let basePath = "/";
-    if (p && p.trim() !== "") {
-        basePath += `?proxyip=${p.trim()}`;
+    // 🟢 伪装逻辑: 
+    // 1. 默认使用 NODE_DEFAULT_PATH ("/api/v1")，不带 IP 参数，实现隐藏。
+    // 2. 只有当 p (请求的ProxyIP) 与后台设置的不一致时，才强制显示 ?proxyip=...
+    
+    // 先清理 p 中的换行等
+    const safeP = p ? p.trim() : "";
+    
+    let finalPath = NODE_DEFAULT_PATH;
+    
+    // 如果存在 safeP 且不为空 (这里可以增加逻辑：如果 safeP == DEFAULT_PROXY_IP 则也不加参数)
+    // 但为了逻辑简单，只有 safeP 存在时，我们才追加参数覆盖默认路径
+    if (safeP && safeP !== "") {
+        finalPath += `?proxyip=${safeP}`;
+    } else {
+        // 如果没有传入 proxyip，且为了进一步优化，可以在这里追加 Early Data
+        finalPath += "?ed=2048"; 
     }
     
-    const encodedPath = encodeURIComponent(basePath);
+    const encodedPath = encodeURIComponent(finalPath);
 
     return l.map(L => {
         const [a, n] = L.split('#'); if (!a) return "";
