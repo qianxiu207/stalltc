@@ -6,7 +6,7 @@ import { connect } from 'cloudflare:sockets';
 const UUID = ""; // 你的 UUID
 const WEB_PASSWORD = "";  // 管理面板密码
 const SUB_PASSWORD = "";  // 订阅路径密码
-const DEFAULT_PROXY_IP = "";  // 你的 ProxyIP (例如: 1.2.3.4 或 domain.com)
+const DEFAULT_PROXY_IP = "";  // 默认回退 ProxyIP (例如: 1.2.3.4 或 domain.com)
 const ROOT_REDIRECT_URL = ""; 
 
 // =============================================================================
@@ -101,11 +101,9 @@ const handle = (ws, proxyConfig, uuid) => {
   
   // 🟢 智能连接逻辑 (Direct -> Fallback Proxy)
   const cn = async () => {
-    // 1. 尝试直连 (带 2.5秒 超时控制)
-    // 这里的超时是为了解决 CF 屏蔽请求时可能导致的长时间等待问题
+    // 1. 尝试直连 (带 2.5秒 超时控制，实现快速失败)
     try {
         const directPromise = connect({ hostname: inf.host, port: inf.port });
-        // 使用 Promise.race 实现快速失败
         const direct = await Promise.race([
             directPromise.opened.then(() => directPromise),
             new Promise((_, reject) => setTimeout(() => reject('Direct timeout'), 2500))
@@ -113,18 +111,16 @@ const handle = (ws, proxyConfig, uuid) => {
         return direct;
     } catch (e) {
         // 直连失败（报错或超时），静默进入下一步
-        // console.log("直连失败，启用 ProxyIP 回退");
     }
 
     // 2. 直连失败，回退到 ProxyIP
-    // 这正是解决 CF 无法访问 CF 自身问题的关键步骤
     if (proxyConfig && proxyConfig.address) {
         try {
             const proxy = connect({ hostname: proxyConfig.address, port: proxyConfig.port });
             await proxy.opened;
             return proxy;
         } catch (e) {
-            // Proxy 也连不上，那就真没办法了
+            // Proxy 也连不上
         }
     }
 
@@ -221,17 +217,24 @@ export default {
       }
 
       // 3. WebSocket 代理处理
-      // 策略：解析出最终的单个 ProxyIP 对象，传给 handle
+      // 策略：优先从 URL 参数解析 ProxyIP，其次是 Path，最后是环境变量
       let finalProxyConfig = null;
-      
-      // 优先级 1: URL 参数 (?proxyip=...)
-      if (url.pathname.includes('/proxyip=')) {
+      const remoteProxyIP = url.searchParams.get('proxyip'); // 🟢 获取 ?proxyip= 参数
+
+      // 优先级 1: URL 参数 (?proxyip=...) -> 最推荐的标准方式
+      if (remoteProxyIP) {
+          try {
+              finalProxyConfig = await parseIP(remoteProxyIP);
+          } catch (e) {}
+      }
+      // 优先级 2: Path 路径 (/proxyip=...) -> 兼容旧版客户端配置
+      else if (url.pathname.includes('/proxyip=')) {
         try {
             const proxyParam = url.pathname.split('/proxyip=')[1].split('/')[0];
             finalProxyConfig = await parseIP(proxyParam);
         } catch (e) {}
       } 
-      // 优先级 2: 环境变量 (仅取第一个)
+      // 优先级 3: 环境变量 (仅取第一个) -> 默认回退
       else if (_PROXY_IP) {
         try {
             finalProxyConfig = await parseIP(_PROXY_IP);
@@ -275,15 +278,39 @@ async function getCustomIPs(env) {
 
 function genNodes(h, u, p, ipsText, ps = "") {
     let l = ipsText.split('\n').filter(line => line.trim() !== "");
-    const cleanedProxyIP = p ? p.replace(/\n/g, ',') : '';
-    const P = cleanedProxyIP ? `/proxyip=${cleanedProxyIP.trim()}` : "/";
-    const E = encodeURIComponent(P);
+    
+    // 🟢 优化 1: 构建标准的 Path 参数
+    // 默认开启 ed=2560 (Early Data) 优化握手延迟
+    let basePath = "/?ed=2560";
+    
+    // 如果有 ProxyIP，则以标准 URL 参数形式追加
+    if (p && p.trim() !== "") {
+        basePath += `&proxyip=${p.trim()}`;
+    }
+    
+    // 🟢 优化 2: 对整个 Path 进行 URI 编码，防止客户端解析错误
+    const encodedPath = encodeURIComponent(basePath);
+
     return l.map(L => {
         const [a, n] = L.split('#'); if (!a) return "";
         const I = a.trim(); 
+        
         let N = n ? n.trim() : 'Edge-Instance';
         if (ps) N = `${N} ${ps}`;
-        let i = I, pt = "443"; if (I.includes(':') && !I.includes('[')) { const s = I.split(':'); i = s[0]; pt = s[1]; }
-        return `${PT_TYPE}://${u}@${i}:${pt}?encryption=none&security=tls&sni=${h}&alpn=h3&fp=random&allowInsecure=1&type=ws&host=${h}&path=${E}#${encodeURIComponent(N)}`
+        
+        // 处理 IPv6 格式 [xxxx]:port 和常规 ip:port
+        let i = I, pt = "443"; 
+        if (I.includes(']:')) { // IPv6
+            const s = I.split(']:');
+            i = s[0] + ']';
+            pt = s[1];
+        } else if (I.includes(':') && !I.includes('[')) { // IPv4 或 域名
+            const s = I.split(':');
+            i = s[0];
+            pt = s[1];
+        }
+        
+        // 使用优化后的 encodedPath
+        return `${PT_TYPE}://${u}@${i}:${pt}?encryption=none&security=tls&sni=${h}&alpn=h3&fp=random&allowInsecure=1&type=ws&host=${h}&path=${encodedPath}#${encodeURIComponent(N)}`
     }).join('\n');
 }
