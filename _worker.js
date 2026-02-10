@@ -150,315 +150,369 @@ const handle = (ws, pc, uuid, proxyIPList = []) => {
   ws.addEventListener('close', cln); ws.addEventListener('error', cln)
 };
 
-// 简易登录页
+// 极简暗黑风格登录页
 function loginPage() {
     return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>系统访问控制</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Restricted</title>
     <style>
-        body { font-family: sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #1e293b; padding: 2rem; border-radius: 1rem; text-align: center; width: 300px; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; text-align: center; }
-        button { width: 100%; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #2563eb; }
+        :root {
+            --bg: #09090b;
+            --card: #18181b;
+            --border: #27272a;
+            --text: #fafafa;
+            --text-muted: #a1a1aa;
+            --primary: #fafafa;
+            --primary-fg: #09090b;
+        }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            width: 100%;
+            max-width: 350px;
+            padding: 20px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px 24px;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        h2 { margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; }
+        p { color: var(--text-muted); margin: 0 0 24px 0; font-size: 0.875rem; }
+        
+        input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: var(--text);
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: var(--text-muted); }
+        
+        button {
+            width: 100%;
+            background: var(--primary);
+            color: var(--primary-fg);
+            border: none;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h3>访问受限</h3>
-        <input type="password" id="pwd" placeholder="输入密码" onkeypress="if(event.keyCode===13)verify()">
-        <button onclick="verify()">进入</button>
+    <div class="container">
+        <div class="card">
+            <h2>Access Restricted</h2>
+            <p>Please enter your access key to continue.</p>
+            <input type="password" id="pwd" placeholder="Enter Password" autofocus onkeypress="if(event.keyCode===13)verify()">
+            <button onclick="verify()">Continue</button>
+        </div>
     </div>
     <script>
         function verify(){
             const p = document.getElementById("pwd").value;
             if(!p) return;
             document.cookie = "auth=" + p + "; path=/; Max-Age=31536000; SameSite=Lax";
-            setTimeout(() => location.reload(), 300);
+            location.reload();
         }
     </script>
 </body>
 </html>`;
 }
 
-// 美化版管理面板 - 包含二维码、客户端下载和毛玻璃特效
+// 现代化黑白极简面板
 function dashPage(host, uuid, proxyip, subpass) {
     const defaultSubLink = `https://${host}/${subpass}`;
-    const subLinkB64 = btoa(defaultSubLink); // 用于部分一键导入
+    const subLinkB64 = btoa(defaultSubLink);
     
     return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StallTCP Lite - 订阅管理</title>
+    <title>StallTCP Lite</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
-            --primary: #6366f1;
-            --secondary: #a855f7;
-            --bg-dark: #0f172a;
-            --glass-bg: rgba(30, 41, 59, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
+            --bg: #09090b;
+            --card: #18181b;
+            --border: #27272a;
+            --text: #fafafa;
+            --text-muted: #a1a1aa;
+            --primary: #fafafa;
+            --primary-fg: #09090b;
+            --accent: #27272a;
         }
-
         body {
             margin: 0;
-            padding: 0;
+            padding: 20px;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: var(--bg-dark);
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%);
-            color: var(--text-main);
+            background-color: var(--bg);
+            /* 细微的网格背景 */
+            background-image: linear-gradient(var(--border) 1px, transparent 1px),
+            linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: center top;
+            color: var(--text);
             min-height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: center;
-            padding: 20px;
-            box-sizing: border-box;
+            align-items: flex-start;
         }
 
         .container {
             width: 100%;
-            max-width: 480px;
+            max-width: 520px;
             display: flex;
             flex-direction: column;
-            gap: 24px;
-            animation: fadeIn 0.6s ease-out;
+            gap: 20px;
+            padding-top: 40px;
         }
 
-        /* 毛玻璃卡片 */
-        .card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            transition: transform 0.2s;
-        }
-        .card:hover { transform: translateY(-2px); }
-
-        .header { text-align: center; margin-bottom: 20px; }
-        .logo-icon { 
-            font-size: 3rem; 
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            color: transparent;
-            margin-bottom: 10px;
-            display: inline-block;
-        }
-        .title { font-size: 1.5rem; font-weight: 700; margin: 0; }
-        .subtitle { color: var(--text-muted); font-size: 0.9rem; margin-top: 5px; }
-
-        /* 输入框区域 */
-        .field-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; display: block; }
-        .input-group {
+        .header {
             display: flex;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            padding: 4px;
-            transition: border-color 0.3s;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
         }
-        .input-group:focus-within { border-color: var(--primary); }
-        
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+            letter-spacing: -0.025em;
+        }
+        .badge {
+            font-size: 0.75rem;
+            background: var(--accent);
+            color: var(--text-muted);
+            padding: 2px 8px;
+            border-radius: 99px;
+            border: 1px solid var(--border);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
         input {
             flex: 1;
-            background: transparent;
-            border: none;
-            color: var(--text-main);
-            padding: 12px;
-            font-size: 0.95rem;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: var(--text);
+            font-family: monospace;
+            font-size: 0.9rem;
             outline: none;
-            min-width: 0;
         }
+        input:focus { border-color: var(--text-muted); }
 
         .btn {
-            padding: 10px 16px;
-            border-radius: 8px;
+            background: var(--primary);
+            color: var(--primary-fg);
             border: none;
-            font-weight: 600;
+            border-radius: 6px;
+            padding: 0 16px;
+            font-size: 0.875rem;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: opacity 0.2s;
             display: flex;
             align-items: center;
             gap: 6px;
-            font-size: 0.9rem;
         }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: #4f46e5; }
-        .btn-copy { background: #334155; color: white; margin: 4px; }
-        .btn-copy:hover { background: #475569; }
+        .btn:hover { opacity: 0.9; }
+        .btn-icon { padding: 10px; }
 
         /* 二维码区域 */
-        .qr-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid var(--glass-border);
-        }
-        #qrcode {
-            background: white;
-            padding: 10px;
-            border-radius: 12px;
-            margin-top: 10px;
+        .qr-wrapper {
+            background: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            width: fit-content;
+            margin: 0 auto;
         }
         #qrcode img { display: block; }
 
-        /* 快捷操作区 */
-        .actions-grid {
+        /* 操作网格 */
+        .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-top: 15px;
         }
-        .action-btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--glass-border);
-            color: var(--text-muted);
-            padding: 12px;
-            border-radius: 12px;
+        .action-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
             text-decoration: none;
-            text-align: center;
-            font-size: 0.85rem;
+            color: var(--text-muted);
             transition: all 0.2s;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 5px;
+            gap: 8px;
+            font-size: 0.875rem;
         }
-        .action-btn i { font-size: 1.2rem; color: var(--text-main); }
-        .action-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-main); transform: translateY(-2px); }
+        .action-card:hover {
+            background: var(--accent);
+            color: var(--text);
+            border-color: var(--text-muted);
+        }
+        .action-card i { font-size: 1.25rem; color: var(--text); }
 
-        /* 底部信息 */
         .footer {
-            text-align: center;
-            margin-top: 10px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
         }
-        .btn-logout {
-            background: transparent;
+        .logout {
             color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            width: 100%;
-            justify-content: center;
-        }
-        .btn-logout:hover { background: rgba(239, 68, 68, 0.1); }
-
-        /* Toast 提示 */
-        #toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%) translateY(50px);
-            background: #10b981;
-            color: white;
-            padding: 10px 24px;
-            border-radius: 50px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-            opacity: 0;
-            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-            pointer-events: none;
+            font-size: 0.875rem;
+            cursor: pointer;
+            text-decoration: none;
             display: flex;
             align-items: center;
-            gap: 8px;
-            z-index: 100;
+            gap: 4px;
+        }
+        .uuid-display {
+            font-family: monospace;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--primary);
+            color: var(--primary-fg);
+            padding: 8px 16px;
+            border-radius: 99px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
-
     <div class="container">
         <div class="header">
-            <i class="ri-radar-fill logo-icon"></i>
-            <h1 class="title">StallTCP Lite</h1>
-            <p class="subtitle">无状态 · 轻量级 · 节点订阅管理</p>
+            <i class="ri-globe-line" style="font-size: 1.5rem;"></i>
+            <h1>Worker Panel</h1>
+            <span class="badge">Lite</span>
         </div>
 
         <div class="card">
-            <label class="field-label">通用订阅链接 (Clash / Sing-box / V2ray)</label>
-            <div class="input-group">
+            <span class="label">Subscription Link</span>
+            <div class="input-wrapper">
                 <input type="text" id="subLink" value="${defaultSubLink}" readonly onclick="this.select()">
-                <button class="btn btn-copy" onclick="copyLink()"><i class="ri-file-copy-line"></i> 复制</button>
+                <button class="btn" onclick="copyLink()">Copy</button>
             </div>
-            
-            <div class="qr-section">
-                <label class="field-label" style="margin-bottom:0">扫码订阅</label>
+            <div class="qr-wrapper">
                 <div id="qrcode"></div>
             </div>
         </div>
 
-        <div class="card">
-            <label class="field-label">快捷导入 & 客户端下载</label>
-            <div class="actions-grid">
-                <a href="clash://install-config?url=${encodeURIComponent(defaultSubLink)}" class="action-btn">
-                    <i class="ri-speed-mini-fill"></i> 导入 Clash
-                </a>
-                <a href="shadowrocket://add/sub://${subLinkB64}" class="action-btn">
-                    <i class="ri-rocket-2-fill"></i> 导入 Shadowrocket
-                </a>
-                <a href="https://github.com/2dust/v2rayNG/releases" target="_blank" class="action-btn">
-                    <i class="ri-android-fill"></i> 下载 v2rayNG
-                </a>
-                <a href="https://github.com/SagerNet/sing-box/releases" target="_blank" class="action-btn">
-                    <i class="ri-box-3-fill"></i> 下载 Sing-box
-                </a>
-            </div>
+        <div class="grid">
+            <a href="clash://install-config?url=${encodeURIComponent(defaultSubLink)}" class="action-card">
+                <i class="ri-speed-mini-fill"></i>
+                <span>Import Clash</span>
+            </a>
+            <a href="shadowrocket://add/sub://${subLinkB64}" class="action-card">
+                <i class="ri-rocket-2-fill"></i>
+                <span>Import Shadowrocket</span>
+            </a>
+            <a href="https://github.com/2dust/v2rayNG/releases" target="_blank" class="action-card">
+                <i class="ri-android-fill"></i>
+                <span>Get v2rayNG</span>
+            </a>
+            <a href="https://github.com/SagerNet/sing-box/releases" target="_blank" class="action-card">
+                <i class="ri-box-3-fill"></i>
+                <span>Get Sing-box</span>
+            </a>
         </div>
 
         <div class="footer">
-            <button class="btn btn-logout" onclick="logout()">
-                <i class="ri-shut-down-line"></i> 退出登录
-            </button>
-            <p style="font-size:0.75rem; color:#475569; margin-top:15px; font-family:monospace">UUID: ${uuid.substring(0,8)}***</p>
+            <span class="uuid-display">ID: ${uuid.substring(0,8)}...</span>
+            <div class="logout" onclick="logout()">
+                <i class="ri-logout-box-r-line"></i> Log out
+            </div>
         </div>
     </div>
 
-    <div id="toast"><i class="ri-check-line"></i> 复制成功</div>
+    <div id="toast">Copied to clipboard</div>
 
     <script>
-        // 生成二维码
         new QRCode(document.getElementById("qrcode"), {
             text: "${defaultSubLink}",
-            width: 140,
-            height: 140,
+            width: 128,
+            height: 128,
             colorDark : "#000000",
             colorLight : "#ffffff",
             correctLevel : QRCode.CorrectLevel.M
         });
 
-        // 复制功能
         function copyLink() {
             const el = document.getElementById('subLink');
             el.select();
-            navigator.clipboard.writeText(el.value).then(() => {
-                showToast();
-            }).catch(() => {
-                alert('复制失败，请手动复制');
-            });
+            navigator.clipboard.writeText(el.value).then(() => showToast()).catch(() => alert('Copy failed'));
         }
 
-        // 登出功能
         function logout() {
-            if(confirm('确定要退出登录吗？')) {
-                document.cookie = "auth=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
-                location.reload();
-            }
+            document.cookie = "auth=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+            location.reload();
         }
 
-        // Toast 动画
         function showToast() {
             const t = document.getElementById('toast');
             t.classList.add('show');
