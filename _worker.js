@@ -3,15 +3,11 @@ import { connect } from 'cloudflare:sockets';
 // =============================================================================
 // 🟣 用户配置区域
 // =============================================================================
-const UUID = ""; // 你的 UUID
-const WEB_PASSWORD = "";  // 管理面板密码
-const SUB_PASSWORD = "";  // 订阅路径密码
-
-// 🟢【关键】：如果后台没设环境变量，这里必须填一个有效的 ProxyIP！
-// 比如填入: proxy.xxxxxxxx.tk:50001 (cs.js里的那个) 或者你自己收集的优选IP
-const DEFAULT_PROXY_IP = "proxy.xxxxxxxx.tk:50001";  
-
-const ROOT_REDIRECT_URL = "https://www.google.com"; 
+const UUID = ""; // 你的 UUID (请在后台环境变量中设置 UUID)
+const WEB_PASSWORD = "";  // 管理面板密码 (请在后台环境变量中设置 WEB_PASSWORD)
+const SUB_PASSWORD = "";  // 订阅路径密码 (请在后台环境变量中设置 SUB_PASSWORD)
+const DEFAULT_PROXY_IP = ""; 
+const ROOT_REDIRECT_URL = ""; 
 
 // =============================================================================
 // ⚡️ 核心逻辑区
@@ -118,7 +114,7 @@ const handle = (ws, proxyConfig, uuid) => {
     }
 
     // 2. 直连失败，回退到 ProxyIP
-    // 如果 proxyConfig 为空，说明没有配置 PROXYIP，这里就会失败
+    // 这里的 proxyConfig 现在完全来源于环境变量
     if (proxyConfig && proxyConfig.address) {
         try {
             const proxy = connect({ hostname: proxyConfig.address, port: proxyConfig.port });
@@ -190,8 +186,9 @@ export default {
       const _WEB_PW = getEnv(env, 'WEB_PASSWORD', WEB_PASSWORD);
       const _SUB_PW = getEnv(env, 'SUB_PASSWORD', SUB_PASSWORD);
       
-      // 🟢 修复核心：正确读取环境变量，如果没设则使用 DEFAULT_PROXY_IP
-      const _PROXY_IP_RAW = getEnv(env, 'PROXYIP', DEFAULT_PROXY_IP);
+      // 🟢 修复核心：兼容多种变量名
+      // 依次尝试读取 'PROXYIP' -> 'DEFAULT_PROXY_IP' -> 最后是代码里的空字符串
+      const _PROXY_IP_RAW = env.PROXYIP || env.DEFAULT_PROXY_IP || DEFAULT_PROXY_IP;
       const _PS = getEnv(env, 'PS', ""); 
       
       const _PROXY_IP = _PROXY_IP_RAW ? _PROXY_IP_RAW.split(/[,\n]/)[0].trim() : "";
@@ -240,7 +237,7 @@ export default {
             finalProxyConfig = await parseIP(proxyParam);
         } catch (e) {}
       } 
-      // 优先级 3: 环境变量/默认值 (🟢 修复点：这里现在会使用 _PROXY_IP_RAW 的值)
+      // 优先级 3: 环境变量 (env.PROXYIP 或 env.DEFAULT_PROXY_IP)
       else if (_PROXY_IP) {
         try {
             finalProxyConfig = await parseIP(_PROXY_IP);
