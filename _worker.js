@@ -6,7 +6,11 @@ import { connect } from 'cloudflare:sockets';
 const UUID = ""; // 你的 UUID
 const WEB_PASSWORD = "";  // 管理面板密码
 const SUB_PASSWORD = "";  // 订阅路径密码
-const DEFAULT_PROXY_IP = "";  // 默认回退 ProxyIP (例如: 1.2.3.4 或 domain.com)
+
+// 🟢【关键】：如果后台没设环境变量，这里必须填一个有效的 ProxyIP！
+// 比如填入: proxy.xxxxxxxx.tk:50001 (cs.js里的那个) 或者你自己收集的优选IP
+const DEFAULT_PROXY_IP = "proxy.xxxxxxxx.tk:50001";  
+
 const ROOT_REDIRECT_URL = "https://www.google.com"; 
 
 // =============================================================================
@@ -110,10 +114,11 @@ const handle = (ws, proxyConfig, uuid) => {
         ]);
         return direct;
     } catch (e) {
-        // 直连失败（报错或超时），静默进入下一步
+        // 直连失败，进入 ProxyIP 回退
     }
 
     // 2. 直连失败，回退到 ProxyIP
+    // 如果 proxyConfig 为空，说明没有配置 PROXYIP，这里就会失败
     if (proxyConfig && proxyConfig.address) {
         try {
             const proxy = connect({ hostname: proxyConfig.address, port: proxyConfig.port });
@@ -184,6 +189,8 @@ export default {
       const _UUID = env.KEY ? await getDynamicUUID(env.KEY) : getEnv(env, 'UUID', UUID);
       const _WEB_PW = getEnv(env, 'WEB_PASSWORD', WEB_PASSWORD);
       const _SUB_PW = getEnv(env, 'SUB_PASSWORD', SUB_PASSWORD);
+      
+      // 🟢 修复核心：正确读取环境变量，如果没设则使用 DEFAULT_PROXY_IP
       const _PROXY_IP_RAW = getEnv(env, 'PROXYIP', DEFAULT_PROXY_IP);
       const _PS = getEnv(env, 'PS', ""); 
       
@@ -217,24 +224,23 @@ export default {
       }
 
       // 3. WebSocket 代理处理
-      // 策略：优先从 URL 参数解析 ProxyIP，其次是 Path，最后是环境变量
       let finalProxyConfig = null;
-      const remoteProxyIP = url.searchParams.get('proxyip'); // 🟢 获取 ?proxyip= 参数
+      const remoteProxyIP = url.searchParams.get('proxyip'); 
 
-      // 优先级 1: URL 参数 (?proxyip=...) -> 最推荐的标准方式
+      // 优先级 1: URL 参数 (?proxyip=...)
       if (remoteProxyIP) {
           try {
               finalProxyConfig = await parseIP(remoteProxyIP);
           } catch (e) {}
       }
-      // 优先级 2: Path 路径 (/proxyip=...) -> 兼容旧版客户端配置
+      // 优先级 2: Path 路径 (/proxyip=...)
       else if (url.pathname.includes('/proxyip=')) {
         try {
             const proxyParam = url.pathname.split('/proxyip=')[1].split('/')[0];
             finalProxyConfig = await parseIP(proxyParam);
         } catch (e) {}
       } 
-      // 优先级 3: 环境变量 (仅取第一个) -> 默认回退
+      // 优先级 3: 环境变量/默认值 (🟢 修复点：这里现在会使用 _PROXY_IP_RAW 的值)
       else if (_PROXY_IP) {
         try {
             finalProxyConfig = await parseIP(_PROXY_IP);
@@ -279,14 +285,13 @@ async function getCustomIPs(env) {
 function genNodes(h, u, p, ipsText, ps = "") {
     let l = ipsText.split('\n').filter(line => line.trim() !== "");
     
-    // 🟢 优化: 移除 ed=2560，直接使用标准的 ProxyIP 参数格式
-    // 如果存在 ProxyIP (p)，则追加到查询参数中
+    // 🟢 修复：彻底移除 ed=2560，使用纯净路径 "/"
+    // 并且如果 p (ProxyIP) 存在，通过标准 Query 参数添加，确保客户端能识别
     let basePath = "/";
     if (p && p.trim() !== "") {
         basePath += `?proxyip=${p.trim()}`;
     }
     
-    // 对整个 Path 进行 URI 编码
     const encodedPath = encodeURIComponent(basePath);
 
     return l.map(L => {
@@ -296,13 +301,12 @@ function genNodes(h, u, p, ipsText, ps = "") {
         let N = n ? n.trim() : 'Edge-Instance';
         if (ps) N = `${N} ${ps}`;
         
-        // 处理 IPv6 格式 [xxxx]:port 和常规 ip:port
         let i = I, pt = "443"; 
-        if (I.includes(']:')) { // IPv6
+        if (I.includes(']:')) { 
             const s = I.split(']:');
             i = s[0] + ']';
             pt = s[1];
-        } else if (I.includes(':') && !I.includes('[')) { // IPv4 或 域名
+        } else if (I.includes(':') && !I.includes('[')) { 
             const s = I.split(':');
             i = s[0];
             pt = s[1];
